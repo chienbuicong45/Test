@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GreenHouse Monitor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="hero">
+        <div class="hero__content">
+          <p class="eyebrow">ESP32 + Firebase</p>
+          <h1>GreenHouse Monitor</h1>
+          <p class="hero__copy">
+            Theo doi nhiet do, do am, anh sang va do am dat theo thoi gian thuc.
+          </p>
+        </div>
+        <div class="hero__status" aria-live="polite">
+          <span id="connectionDot" class="status-dot"></span>
+          <span id="connectionText">Dang ket noi Firebase...</span>
+        </div>
+      </section>
+
+      <section class="toolbar" aria-label="Dieu khien">
+        <div>
+          <p class="label">Duong dan du lieu</p>
+          <strong id="databasePath">greenhouse/latest</strong>
+        </div>
+        <button id="refreshButton" type="button" class="icon-button" title="Tai lai du lieu">
+          <span aria-hidden="true">↻</span>
+          <span class="sr-only">Tai lai du lieu</span>
+        </button>
+      </section>
+
+      <section class="sensor-grid" aria-label="Chi so cam bien">
+        <article class="sensor-card sensor-card--temp">
+          <div class="sensor-card__top">
+            <span class="sensor-icon" aria-hidden="true">℃</span>
+            <span id="tempStatus" class="pill">--</span>
+          </div>
+          <p class="label">Nhiet do</p>
+          <h2><span id="temperature">--</span><small>°C</small></h2>
+          <div class="meter"><span id="temperatureMeter"></span></div>
+        </article>
+
+        <article class="sensor-card sensor-card--humidity">
+          <div class="sensor-card__top">
+            <span class="sensor-icon" aria-hidden="true">%</span>
+            <span id="humidityStatus" class="pill">--</span>
+          </div>
+          <p class="label">Do am khong khi</p>
+          <h2><span id="humidity">--</span><small>%</small></h2>
+          <div class="meter"><span id="humidityMeter"></span></div>
+        </article>
+
+        <article class="sensor-card sensor-card--soil">
+          <div class="sensor-card__top">
+            <span class="sensor-icon" aria-hidden="true">◌</span>
+            <span id="soilStatus" class="pill">--</span>
+          </div>
+          <p class="label">Do am dat</p>
+          <h2><span id="soil">--</span><small>%</small></h2>
+          <div class="meter"><span id="soilMeter"></span></div>
+        </article>
+
+        <article class="sensor-card sensor-card--light">
+          <div class="sensor-card__top">
+            <span class="sensor-icon" aria-hidden="true">☼</span>
+            <span id="lightStatus" class="pill">--</span>
+          </div>
+          <p class="label">Anh sang</p>
+          <h2><span id="light">--</span><small>lux</small></h2>
+          <div class="meter"><span id="lightMeter"></span></div>
+        </article>
+      </section>
+
+      <section class="panel-grid">
+        <article class="panel">
+          <div class="panel__header">
+            <div>
+              <p class="label">Trang thai thiet bi</p>
+              <h3>Dieu khien tu dong</h3>
+            </div>
+            <span id="lastUpdate" class="timestamp">--</span>
+          </div>
+          <div class="device-list">
+            <div class="device-row">
+              <span class="device-icon" aria-hidden="true">⎋</span>
+              <div>
+                <p>Quat thong gio</p>
+                <strong id="fanState">--</strong>
+              </div>
+            </div>
+            <div class="device-row">
+              <span class="device-icon" aria-hidden="true">≋</span>
+              <div>
+                <p>Bom tuoi</p>
+                <strong id="pumpState">--</strong>
+              </div>
+            </div>
+            <div class="device-row">
+              <span class="device-icon" aria-hidden="true">●</span>
+              <div>
+                <p>Den trong cay</p>
+                <strong id="lampState">--</strong>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="panel__header">
+            <div>
+              <p class="label">Du lieu Firebase</p>
+              <h3>Ban ghi gan nhat</h3>
+            </div>
+          </div>
+          <pre id="rawData" class="raw-data">{}</pre>
+        </article>
+      </section>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
