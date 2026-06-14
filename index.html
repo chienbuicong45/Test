@@ -4,14 +4,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Greenhouse Monitor</title>
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <main id="authView" class="auth-view">
       <section class="auth-card">
         <p class="eyebrow">Đăng nhập</p>
         <h1>Greenhouse Monitor</h1>
-        <p class="auth-copy">Đăng nhập bằng tài khoản Firebase để xem dữ liệu nhà kính.</p>
+        <p class="auth-copy">
+          Đăng nhập bằng tài khoản Firebase để xem dữ liệu nhà kính.
+        </p>
         <form id="loginForm" class="auth-form">
           <label>
             <span>Email</span>
@@ -21,7 +23,7 @@
             <span>Mật khẩu</span>
             <input id="passwordInput" type="password" autocomplete="current-password" required />
           </label>
-          <button type="submit">Đăng nhập</button>
+          <button id="loginButton" type="submit">Đăng nhập</button>
         </form>
         <p id="authMessage" class="auth-message"></p>
       </section>
@@ -36,11 +38,13 @@
             Theo dõi nhiệt độ, độ ẩm và trạng thái môi trường theo thời gian thực.
           </p>
         </div>
-        <div class="status-pill">
-          <span class="pulse"></span>
-          <span id="connectionText">Đang nhận dữ liệu</span>
+        <div class="hero-actions">
+          <div class="status-pill">
+            <span class="pulse"></span>
+            <span id="connectionText">Đang khởi động</span>
+          </div>
+          <button id="logoutButton" class="logout-button" type="button">Đăng xuất</button>
         </div>
-        <button id="logoutButton" class="logout-button" type="button">Đăng xuất</button>
       </header>
 
       <section class="metrics" aria-label="Chỉ số hiện tại">
@@ -107,6 +111,6 @@
       </section>
     </main>
 
-    <script type="module" src="script.js"></script>
+    <script src="./script.js"></script>
   </body>
 </html>

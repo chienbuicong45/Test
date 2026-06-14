@@ -172,6 +172,13 @@ h2 {
   line-height: 1.55;
 }
 
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;
@@ -379,6 +386,11 @@ h2 {
   .logout-button,
   .legend {
     margin-top: 18px;
+  }
+
+  .hero-actions {
+    display: flex;
+    justify-content: flex-start;
   }
 
   .metrics,

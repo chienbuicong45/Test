@@ -8,9 +8,9 @@ const firebaseConfig = {
   measurementId: "G-MZRGJLD3PP",
 };
 
-const collections = {
-  readings: "greenhouse_readings",
-  readingsDoc: "greenhouse_readings_current",
+const firestorePath = {
+  collection: "greenhouse_readings",
+  document: "current",
 };
 
 const authView = document.querySelector("#authView");
@@ -36,24 +36,33 @@ const context = chart.getContext("2d");
 
 const maxPoints = 60;
 const readings = [];
-let tick = 0;
-let db = null;
+
 let auth = null;
-let firestoreApi = null;
+let db = null;
 let authApi = null;
-let localIntervalId = null;
-let chartIntervalId = null;
+let firestoreApi = null;
 let unsubscribeReadings = null;
 let latestReading = null;
 let latestReadingReceivedAt = 0;
-
-function hasFirebaseConfig(config) {
-  return Object.values(config).every((value) => value && !value.startsWith("YOUR_"));
-}
+let chartIntervalId = null;
 
 function getFirebaseErrorText(error) {
-  if (!error?.code) return "Không rõ lỗi";
-  return `${error.code}: ${error.message || "Không có mô tả"}`;
+  const code = error?.code || "unknown";
+  const message = error?.message || "Không có mô tả lỗi";
+
+  if (code === "auth/unauthorized-domain") {
+    return "Domain hiện tại chưa được thêm vào Firebase Authentication > Settings > Authorized domains.";
+  }
+
+  if (code === "auth/invalid-credential" || code === "auth/wrong-password" || code === "auth/user-not-found") {
+    return "Email hoặc mật khẩu không đúng.";
+  }
+
+  if (code === "permission-denied") {
+    return "Firestore rules chưa cho tài khoản này đọc dữ liệu.";
+  }
+
+  return `${code}: ${message}`;
 }
 
 function showAuthView(message = "") {
@@ -71,25 +80,16 @@ function showDashboardView() {
 }
 
 async function setupFirebase() {
-  if (!hasFirebaseConfig(firebaseConfig)) {
-    showDashboardView();
-    connectionText.textContent = "Demo local - chưa cấu hình Firebase";
-    addEvent("Chưa cấu hình Firebase, đang dùng dữ liệu demo", "warning");
-    for (let index = 0; index < 24; index += 1) {
-      addLocalReading();
-    }
-    localIntervalId = setInterval(addLocalReading, 2000);
-    return;
-  }
+  authMessage.textContent = "Đang kết nối Firebase...";
 
   try {
-    const [{ initializeApp }, firestore, authModule] = await Promise.all([
+    const [{ initializeApp }, firestoreModule, authModule] = await Promise.all([
       import("https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js"),
       import("https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js"),
       import("https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js"),
     ]);
 
-    firestoreApi = firestore;
+    firestoreApi = firestoreModule;
     authApi = authModule;
 
     const app = initializeApp(firebaseConfig);
@@ -111,7 +111,7 @@ async function setupFirebase() {
     });
   } catch (error) {
     console.error(error);
-    showAuthView(`Không thể kết nối Firebase - ${getFirebaseErrorText(error)}`);
+    showAuthView(`Không thể tải Firebase. Kiểm tra kết nối mạng hoặc chặn CDN. ${getFirebaseErrorText(error)}`);
   }
 }
 
@@ -119,14 +119,14 @@ function listenToReadings() {
   stopReadingFirestore();
   stopChartPlayback();
 
-  const readingRef = firestoreApi.doc(db, collections.readings, collections.readingsDoc);
+  const readingRef = firestoreApi.doc(db, firestorePath.collection, firestorePath.document);
 
   unsubscribeReadings = firestoreApi.onSnapshot(
     readingRef,
     (snapshot) => {
       if (!snapshot.exists()) {
         connectionText.textContent = "Firestore sẵn sàng - chưa có dữ liệu";
-        addEvent("Chưa có document greenhouse_readings/current", "warning");
+        addEvent(`Chưa có document ${firestorePath.collection}/${firestorePath.document}`, "warning");
         return;
       }
 
@@ -138,43 +138,15 @@ function listenToReadings() {
 
       latestReading = latest;
       latestReadingReceivedAt = Date.now();
-      pushLocalReading(latest);
+      pushReading(latest);
       startChartPlayback();
-      connectionText.textContent = `Firestore ${latest.time.toLocaleTimeString("vi-VN")}`;
     },
     (error) => {
       console.error(error);
       connectionText.textContent = "Lỗi đọc Firestore";
-      addEvent(`Không đọc được dữ liệu Firestore - ${getFirebaseErrorText(error)}`, "danger");
+      addEvent(`Không đọc được dữ liệu Firestore: ${getFirebaseErrorText(error)}`, "danger");
     },
   );
-}
-
-function startChartPlayback() {
-  if (chartIntervalId) return;
-
-  chartIntervalId = setInterval(() => {
-    if (!latestReading) return;
-    if (Date.now() - latestReadingReceivedAt < 1800) return;
-
-    pushLocalReading({
-      ...latestReading,
-      time: new Date(),
-    });
-  }, 2000);
-}
-
-function stopChartPlayback() {
-  clearInterval(chartIntervalId);
-  chartIntervalId = null;
-  latestReading = null;
-}
-
-function stopReadingFirestore() {
-  if (unsubscribeReadings) {
-    unsubscribeReadings();
-    unsubscribeReadings = null;
-  }
 }
 
 function normalizeReading(data) {
@@ -192,22 +164,29 @@ function normalizeReading(data) {
   };
 }
 
-function createReading() {
-  tick += 1;
-  const baseTemp = 28 + Math.sin(tick / 8) * 2.2;
-  const baseHumidity = 68 + Math.cos(tick / 10) * 7;
-  const temperature = clamp(baseTemp + randomBetween(-0.7, 0.9), 21, 38);
-  const humidity = clamp(baseHumidity + randomBetween(-2.8, 2.6), 38, 92);
+function startChartPlayback() {
+  if (chartIntervalId) return;
 
-  return {
-    time: new Date(),
-    temperature: Number(temperature.toFixed(1)),
-    humidity: Math.round(humidity),
-  };
+  chartIntervalId = setInterval(() => {
+    if (!latestReading || Date.now() - latestReadingReceivedAt < 1800) return;
+
+    pushReading({
+      ...latestReading,
+      time: new Date(),
+    });
+  }, 2000);
 }
 
-function randomBetween(min, max) {
-  return Math.random() * (max - min) + min;
+function stopChartPlayback() {
+  clearInterval(chartIntervalId);
+  chartIntervalId = null;
+  latestReading = null;
+}
+
+function stopReadingFirestore() {
+  if (!unsubscribeReadings) return;
+  unsubscribeReadings();
+  unsubscribeReadings = null;
 }
 
 function clamp(value, min, max) {
@@ -237,7 +216,7 @@ function updateDashboard(reading) {
   const [humidityMessage, humidityLevel] = getHumidityStatus(reading.humidity);
   const health = calculateHealth(reading.temperature, reading.humidity);
 
-  temperatureValue.textContent = `${reading.temperature}C`;
+  temperatureValue.textContent = `${reading.temperature}°C`;
   humidityValue.textContent = `${reading.humidity}%`;
   healthValue.textContent = `${health}%`;
   temperatureBar.style.width = `${clamp((reading.temperature / 40) * 100, 0, 100)}%`;
@@ -248,13 +227,8 @@ function updateDashboard(reading) {
   healthStatus.textContent = health >= 75 ? "Môi trường ổn định" : "Cần theo dõi điều kiện";
   connectionText.textContent = `Cập nhật ${reading.time.toLocaleTimeString("vi-VN")}`;
 
-  if (tempLevel !== "normal") {
-    addEvent(tempMessage, tempLevel);
-  }
-
-  if (humidityLevel !== "normal") {
-    addEvent(humidityMessage, humidityLevel);
-  }
+  if (tempLevel !== "normal") addEvent(tempMessage, tempLevel);
+  if (humidityLevel !== "normal") addEvent(humidityMessage, humidityLevel);
 }
 
 function addEvent(message, level = "normal") {
@@ -332,8 +306,8 @@ function drawGrid(width, height, padding, plotWidth, plotHeight) {
     context.stroke();
   }
 
-  context.fillText("40C / 100%", 4, padding.top + 4);
-  context.fillText("18C / 30%", 6, height - padding.bottom);
+  context.fillText("40°C / 100%", 4, padding.top + 4);
+  context.fillText("18°C / 30%", 6, height - padding.bottom);
   context.fillText("60 giây", width - 68, height - 8);
 }
 
@@ -359,7 +333,7 @@ function drawLine({ color, points, min, max, padding, plotWidth, plotHeight }) {
   context.stroke();
 }
 
-function pushLocalReading(reading) {
+function pushReading(reading) {
   readings.push(reading);
 
   while (readings.length > maxPoints) {
@@ -370,14 +344,13 @@ function pushLocalReading(reading) {
   drawChart();
 }
 
-function addLocalReading() {
-  pushLocalReading(createReading());
-}
-
 loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
-  if (!authApi || !auth) return;
+  if (!authApi || !auth) {
+    authMessage.textContent = "Firebase chưa sẵn sàng.";
+    return;
+  }
 
   authMessage.textContent = "Đang đăng nhập...";
 
@@ -387,7 +360,7 @@ loginForm.addEventListener("submit", async (event) => {
     authMessage.textContent = "";
   } catch (error) {
     console.error(error);
-    authMessage.textContent = `Đăng nhập thất bại - ${getFirebaseErrorText(error)}`;
+    authMessage.textContent = `Đăng nhập thất bại: ${getFirebaseErrorText(error)}`;
   }
 });
 
@@ -401,16 +374,14 @@ logoutButton.addEventListener("click", async () => {
     stopChartPlayback();
   } catch (error) {
     console.error(error);
-    addEvent(`Không thể đăng xuất - ${getFirebaseErrorText(error)}`, "danger");
+    addEvent(`Không thể đăng xuất: ${getFirebaseErrorText(error)}`, "danger");
   }
 });
 
 window.addEventListener("resize", resizeCanvas);
-
-setupFirebase();
-
 window.addEventListener("beforeunload", () => {
-  clearInterval(localIntervalId);
   stopChartPlayback();
   stopReadingFirestore();
 });
+
+setupFirebase();
