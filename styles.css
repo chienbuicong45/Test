@@ -92,9 +92,11 @@ input {
 .password-field {
   position: relative;
   display: block;
+  width: 100%;
 }
 
 .password-field input {
+  display: block;
   padding-right: 52px;
 }
 
@@ -114,6 +116,7 @@ input {
   color: var(--green);
   background: transparent;
   cursor: pointer;
+  z-index: 2;
 }
 
 .eye-icon {

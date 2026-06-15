@@ -87,6 +87,18 @@ function hidePassword() {
   passwordToggle.setAttribute("aria-pressed", "false");
 }
 
+function togglePasswordVisibility() {
+  const isPasswordHidden = passwordInput.type === "password";
+
+  passwordInput.type = isPasswordHidden ? "text" : "password";
+  passwordToggle.classList.toggle("is-visible", isPasswordHidden);
+  passwordToggle.setAttribute("aria-label", isPasswordHidden ? "Ẩn mật khẩu" : "Hiện mật khẩu");
+  passwordToggle.setAttribute("aria-pressed", String(isPasswordHidden));
+  passwordInput.focus();
+}
+
+window.togglePasswordVisibility = togglePasswordVisibility;
+
 async function setupFirebase() {
   authMessage.textContent = "Đang kết nối Firebase...";
 
@@ -372,15 +384,6 @@ loginForm.addEventListener("submit", async (event) => {
     console.error(error);
     authMessage.textContent = `Đăng nhập thất bại: ${getFirebaseErrorText(error)}`;
   }
-});
-
-passwordToggle.addEventListener("click", () => {
-  const isPasswordHidden = passwordInput.type === "password";
-
-  passwordInput.type = isPasswordHidden ? "text" : "password";
-  passwordToggle.classList.toggle("is-visible", isPasswordHidden);
-  passwordToggle.setAttribute("aria-label", isPasswordHidden ? "Ẩn mật khẩu" : "Hiện mật khẩu");
-  passwordToggle.setAttribute("aria-pressed", String(isPasswordHidden));
 });
 
 logoutButton.addEventListener("click", async () => {
