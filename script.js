@@ -477,9 +477,22 @@ function drawHistoryChart() {
 
 function drawHistoryLine(color, field, min, max, padding, plotWidth, plotHeight) {
   historyContext.strokeStyle = color;
+  historyContext.fillStyle = color;
   historyContext.lineWidth = 2;
   historyContext.lineJoin = "round";
   historyContext.lineCap = "round";
+
+  if (historyReadings.length === 1) {
+    const normalized = (historyReadings[0][field] - min) / (max - min);
+    const x = padding.left + plotWidth / 2;
+    const y = padding.top + plotHeight - clamp(normalized, 0, 1) * plotHeight;
+
+    historyContext.beginPath();
+    historyContext.arc(x, y, 5, 0, Math.PI * 2);
+    historyContext.fill();
+    return;
+  }
+
   historyContext.beginPath();
 
   const denominator = Math.max(historyReadings.length - 1, 1);
