@@ -11,6 +11,7 @@ const firebaseConfig = {
 const firestorePath = {
   collection: "greenhouse_readings",
   document: "current",
+  historyCollection: "greenhouse_history",
 };
 
 const authView = document.querySelector("#authView");
@@ -34,9 +35,16 @@ const connectionText = document.querySelector("#connectionText");
 const eventLog = document.querySelector("#eventLog");
 const chart = document.querySelector("#environmentChart");
 const context = chart.getContext("2d");
+const historyDaySelect = document.querySelector("#historyDaySelect");
+const historyStatus = document.querySelector("#historyStatus");
+const historyChart = document.querySelector("#historyChart");
+const historyContext = historyChart.getContext("2d");
 
 const maxPoints = 60;
+const historyDays = 7;
 const readings = [];
+let historyReadings = [];
+let historyRequestId = 0;
 
 let auth = null;
 let db = null;
@@ -128,6 +136,8 @@ async function setupFirebase() {
       connectionText.textContent = "Đang kết nối Firestore";
       addEvent(`Đã đăng nhập: ${user.email}`);
       listenToReadings();
+      configureHistoryPicker();
+      loadHistoryForSelectedDay();
     });
   } catch (error) {
     console.error(error);
@@ -179,10 +189,68 @@ function normalizeReading(data) {
   }
 
   return {
-    time: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(),
+    time: data.recordedAt?.toDate
+      ? data.recordedAt.toDate()
+      : data.updatedAt?.toDate
+        ? data.updatedAt.toDate()
+        : new Date(),
     temperature: Number(temperature.toFixed(1)),
     humidity: Math.round(humidity),
   };
+}
+
+function formatDateValue(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function configureHistoryPicker() {
+  const today = new Date();
+  const earliestDay = new Date(today);
+  earliestDay.setDate(today.getDate() - (historyDays - 1));
+
+  historyDaySelect.min = formatDateValue(earliestDay);
+  historyDaySelect.max = formatDateValue(today);
+  historyDaySelect.value = formatDateValue(today);
+}
+
+async function loadHistoryForSelectedDay() {
+  if (!db || !firestoreApi || !historyDaySelect.value) return;
+
+  const requestId = ++historyRequestId;
+  const start = new Date(`${historyDaySelect.value}T00:00:00`);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 1);
+  historyStatus.textContent = "Đang tải dữ liệu lịch sử...";
+
+  try {
+    const historyRef = firestoreApi.collection(db, firestorePath.historyCollection);
+    const historyQuery = firestoreApi.query(
+      historyRef,
+      firestoreApi.where("recordedAt", ">=", firestoreApi.Timestamp.fromDate(start)),
+      firestoreApi.where("recordedAt", "<", firestoreApi.Timestamp.fromDate(end)),
+      firestoreApi.orderBy("recordedAt", "asc"),
+    );
+    const snapshot = await firestoreApi.getDocs(historyQuery);
+    if (requestId !== historyRequestId) return;
+
+    historyReadings = snapshot.docs
+      .map((document) => normalizeReading(document.data()))
+      .filter(Boolean);
+
+    historyStatus.textContent = historyReadings.length
+      ? `${historyReadings.length} mẫu trong ngày ${start.toLocaleDateString("vi-VN")}`
+      : `Chưa có dữ liệu ngày ${start.toLocaleDateString("vi-VN")}`;
+    resizeHistoryCanvas();
+  } catch (error) {
+    if (requestId !== historyRequestId) return;
+    console.error(error);
+    historyReadings = [];
+    historyStatus.textContent = `Không tải được lịch sử: ${getFirebaseErrorText(error)}`;
+    resizeHistoryCanvas();
+  }
 }
 
 function startChartPlayback() {
@@ -354,6 +422,79 @@ function drawLine({ color, points, min, max, padding, plotWidth, plotHeight }) {
   context.stroke();
 }
 
+function resizeHistoryCanvas() {
+  const ratio = window.devicePixelRatio || 1;
+  const rect = historyChart.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+
+  historyChart.width = Math.floor(rect.width * ratio);
+  historyChart.height = Math.floor(rect.height * ratio);
+  historyContext.setTransform(ratio, 0, 0, ratio, 0, 0);
+  drawHistoryChart();
+}
+
+function drawHistoryChart() {
+  const rect = historyChart.getBoundingClientRect();
+  const width = rect.width;
+  const height = rect.height;
+  const padding = { top: 20, right: 18, bottom: 36, left: 42 };
+  const plotWidth = width - padding.left - padding.right;
+  const plotHeight = height - padding.top - padding.bottom;
+
+  historyContext.clearRect(0, 0, width, height);
+  historyContext.strokeStyle = "#e2e9e3";
+  historyContext.fillStyle = "#66736d";
+  historyContext.font = "12px Inter, system-ui, sans-serif";
+  historyContext.lineWidth = 1;
+
+  for (let index = 0; index <= 4; index += 1) {
+    const y = padding.top + (plotHeight / 4) * index;
+    historyContext.beginPath();
+    historyContext.moveTo(padding.left, y);
+    historyContext.lineTo(width - padding.right, y);
+    historyContext.stroke();
+  }
+
+  historyContext.fillText("40°C / 100%", 4, padding.top + 4);
+  historyContext.fillText("18°C / 30%", 6, height - padding.bottom);
+  if (!historyReadings.length) return;
+
+  const firstTime = historyReadings[0].time.toLocaleTimeString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const lastTime = historyReadings.at(-1).time.toLocaleTimeString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  historyContext.fillText(firstTime, padding.left, height - 8);
+  const lastTimeWidth = historyContext.measureText(lastTime).width;
+  historyContext.fillText(lastTime, width - padding.right - lastTimeWidth, height - 8);
+
+  drawHistoryLine("#d95f48", "temperature", 18, 40, padding, plotWidth, plotHeight);
+  drawHistoryLine("#2d7fb8", "humidity", 30, 100, padding, plotWidth, plotHeight);
+}
+
+function drawHistoryLine(color, field, min, max, padding, plotWidth, plotHeight) {
+  historyContext.strokeStyle = color;
+  historyContext.lineWidth = 2;
+  historyContext.lineJoin = "round";
+  historyContext.lineCap = "round";
+  historyContext.beginPath();
+
+  const denominator = Math.max(historyReadings.length - 1, 1);
+  historyReadings.forEach((reading, index) => {
+    const x = padding.left + (plotWidth / denominator) * index;
+    const normalized = (reading[field] - min) / (max - min);
+    const y = padding.top + plotHeight - clamp(normalized, 0, 1) * plotHeight;
+
+    if (index === 0) historyContext.moveTo(x, y);
+    else historyContext.lineTo(x, y);
+  });
+
+  historyContext.stroke();
+}
+
 function pushReading(reading) {
   readings.push(reading);
 
@@ -392,6 +533,7 @@ logoutButton.addEventListener("click", async () => {
   try {
     await authApi.signOut(auth);
     readings.splice(0, readings.length);
+    historyReadings = [];
     eventLog.innerHTML = "";
     stopChartPlayback();
   } catch (error) {
@@ -400,7 +542,12 @@ logoutButton.addEventListener("click", async () => {
   }
 });
 
-window.addEventListener("resize", resizeCanvas);
+historyDaySelect.addEventListener("change", loadHistoryForSelectedDay);
+
+window.addEventListener("resize", () => {
+  resizeCanvas();
+  resizeHistoryCanvas();
+});
 window.addEventListener("beforeunload", () => {
   stopChartPlayback();
   stopReadingFirestore();

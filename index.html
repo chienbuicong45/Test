@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Greenhouse Monitor</title>
-    <link rel="stylesheet" href="./styles.css?v=4" />
+    <link rel="stylesheet" href="./styles.css?v=5" />
   </head>
   <body>
     <main id="authView" class="auth-view">
@@ -130,8 +130,29 @@
           </article>
         </aside>
       </section>
+
+      <section class="history-card" aria-labelledby="historyTitle">
+        <div class="section-head history-head">
+          <div>
+            <p class="eyebrow">Lịch sử</p>
+            <h2 id="historyTitle">Dữ liệu trong 7 ngày gần nhất</h2>
+          </div>
+          <label class="history-picker" for="historyDaySelect">
+            <span>Chọn ngày</span>
+            <input id="historyDaySelect" type="date" />
+          </label>
+        </div>
+        <div class="history-meta">
+          <span id="historyStatus">Chọn ngày để xem dữ liệu</span>
+          <div class="legend">
+            <span><i class="temp-dot"></i>Nhiệt độ</span>
+            <span><i class="humid-dot"></i>Độ ẩm</span>
+          </div>
+        </div>
+        <canvas id="historyChart" aria-label="Biểu đồ dữ liệu lịch sử theo ngày"></canvas>
+      </section>
     </main>
 
-    <script src="./script.js?v=4"></script>
+    <script src="./script.js?v=6"></script>
   </body>
 </html>
