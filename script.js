@@ -12,8 +12,14 @@ const firestorePath = {
   collection: "greenhouse_readings",
   document: "current",
   historyCollection: "greenhouse_history",
-  mailCollection: "mail",
 };
+
+const emailJsConfig = Object.freeze({
+  serviceId: "service_tjcinlf",
+  templateId: "template_puyrylj",
+  publicKey: "C-uAY1RMcz_M-MEnv",
+  endpoint: "https://api.emailjs.com/api/v1.0/email/send",
+});
 
 const authView = document.querySelector("#authView");
 const dashboardView = document.querySelector("#dashboardView");
@@ -389,36 +395,40 @@ function rememberEmailSentAt(alertKey, sentAt) {
 }
 
 async function queueAlertEmail(alertKey, message, reading) {
-  if (!emailNotificationSettings.enabled || !emailNotificationSettings.email || !db || !firestoreApi) return;
+  if (!emailNotificationSettings.enabled || !emailNotificationSettings.email) return;
 
   const now = Date.now();
   const previousSentAt = lastEmailSentAt.get(alertKey) || 0;
   if (now - previousSentAt < emailNotificationCooldown) return;
   rememberEmailSentAt(alertKey, now);
 
-  const recordedAt = reading.time.toLocaleString("vi-VN");
-  const body = [
-    message,
-    `Nhiệt độ: ${reading.temperature}°C`,
-    `Độ ẩm: ${reading.humidity}%`,
-    `Thời gian: ${recordedAt}`,
-  ].join("\n");
-
   try {
-    await firestoreApi.addDoc(
-      firestoreApi.collection(db, firestorePath.mailCollection),
-      {
-        to: emailNotificationSettings.email,
-        message: {
-          subject: `[Greenhouse] ${message}`,
-          text: body,
+    const response = await fetch(emailJsConfig.endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        service_id: emailJsConfig.serviceId,
+        template_id: emailJsConfig.templateId,
+        user_id: emailJsConfig.publicKey,
+        template_params: {
+          to_email: emailNotificationSettings.email,
+          alert_message: message,
+          temperature: reading.temperature,
+          humidity: reading.humidity,
+          recorded_at: reading.time.toLocaleString("vi-VN"),
         },
-      },
-    );
-    addEvent(`Đã xếp hàng email cảnh báo tới ${emailNotificationSettings.email}`);
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText || `EmailJS HTTP ${response.status}`);
+    }
+
+    addEvent(`Đã gửi email cảnh báo tới ${emailNotificationSettings.email}`);
   } catch (error) {
     console.error(error);
-    addEvent(`Không thể tạo email cảnh báo: ${getFirebaseErrorText(error)}`, "danger");
+    addEvent(`Không thể gửi email qua EmailJS: ${error?.message || "Lỗi không xác định"}`, "danger");
   }
 }
 
