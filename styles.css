@@ -166,6 +166,12 @@ input {
   cursor: pointer;
 }
 
+#loginButton:disabled,
+.logout-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
 #loginButton {
   min-height: 46px;
 }

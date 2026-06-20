@@ -56,6 +56,7 @@ let unsubscribeHistory = null;
 let latestReading = null;
 let latestReadingReceivedAt = 0;
 let chartIntervalId = null;
+let resizeFrameId = null;
 
 function getFirebaseErrorText(error) {
   const code = error?.code || "unknown";
@@ -135,7 +136,7 @@ async function setupFirebase() {
 
       showDashboardView();
       readings.splice(0, readings.length);
-      eventLog.innerHTML = "";
+      eventLog.replaceChildren();
       connectionText.textContent = "Đang kết nối Firestore";
       addEvent(`Đã đăng nhập: ${user.email}`);
       listenToReadings();
@@ -335,9 +336,11 @@ function addEvent(message, level = "normal") {
   if (last && last.dataset.message === message) return;
 
   const item = document.createElement("li");
+  const time = document.createElement("strong");
   item.className = level === "normal" ? "" : level;
   item.dataset.message = message;
-  item.innerHTML = `<strong>${new Date().toLocaleTimeString("vi-VN")}</strong>${message}`;
+  time.textContent = new Date().toLocaleTimeString("vi-VN");
+  item.append(time, document.createTextNode(message));
   eventLog.prepend(item);
 
   while (eventLog.children.length > 6) {
@@ -596,7 +599,12 @@ function showReadingTooltip(event, isHistory) {
   const tooltipY = event.clientY - cardRect.top;
 
   tooltip.className = `chart-tooltip is-visible ${isTemperature ? "temperature-tooltip" : "humidity-tooltip"}`;
-  tooltip.innerHTML = `<strong>${label}: ${value}</strong><span>${time}</span>`;
+  tooltip.replaceChildren();
+  const valueElement = document.createElement("strong");
+  const timeElement = document.createElement("span");
+  valueElement.textContent = `${label}: ${value}`;
+  timeElement.textContent = time;
+  tooltip.append(valueElement, timeElement);
   tooltip.style.left = `${tooltipX}px`;
   tooltip.style.top = `${tooltipY}px`;
 }
@@ -625,6 +633,8 @@ loginForm.addEventListener("submit", async (event) => {
   }
 
   authMessage.textContent = "Đang đăng nhập...";
+  const loginButton = loginForm.querySelector("#loginButton");
+  loginButton.disabled = true;
 
   try {
     await authApi.signInWithEmailAndPassword(auth, emailInput.value.trim(), passwordInput.value);
@@ -634,22 +644,27 @@ loginForm.addEventListener("submit", async (event) => {
   } catch (error) {
     console.error(error);
     authMessage.textContent = `Đăng nhập thất bại: ${getFirebaseErrorText(error)}`;
+  } finally {
+    loginButton.disabled = false;
   }
 });
 
 logoutButton.addEventListener("click", async () => {
   if (!authApi || !auth) return;
+  logoutButton.disabled = true;
 
   try {
     await authApi.signOut(auth);
     readings.splice(0, readings.length);
     historyReadings = [];
-    eventLog.innerHTML = "";
+    eventLog.replaceChildren();
     stopHistoryFirestore();
     stopChartPlayback();
   } catch (error) {
     console.error(error);
     addEvent(`Không thể đăng xuất: ${getFirebaseErrorText(error)}`, "danger");
+  } finally {
+    logoutButton.disabled = false;
   }
 });
 
@@ -660,8 +675,11 @@ historyChart.addEventListener("pointermove", (event) => showReadingTooltip(event
 historyChart.addEventListener("pointerleave", () => hideReadingTooltip(historyTooltip));
 
 window.addEventListener("resize", () => {
-  resizeCanvas();
-  resizeHistoryCanvas();
+  cancelAnimationFrame(resizeFrameId);
+  resizeFrameId = requestAnimationFrame(() => {
+    resizeCanvas();
+    resizeHistoryCanvas();
+  });
 });
 window.addEventListener("beforeunload", () => {
   stopChartPlayback();
