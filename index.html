@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#2f8a5f" />
     <title>Greenhouse Monitor</title>
     <link rel="preconnect" href="https://www.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="./styles.css?v=9" />
+    <link rel="stylesheet" href="./styles.css?v=10" />
   </head>
   <body>
     <main id="authView" class="auth-view">
@@ -199,10 +199,13 @@
             <p class="eyebrow">Lịch sử</p>
             <h2 id="historyTitle">Dữ liệu trong 7 ngày gần nhất</h2>
           </div>
-          <label class="history-picker" for="historyDaySelect">
-            <span>Chọn ngày</span>
-            <input id="historyDaySelect" type="date" />
-          </label>
+          <div class="history-actions">
+            <label class="history-picker" for="historyDaySelect">
+              <span>Chọn ngày</span>
+              <input id="historyDaySelect" type="date" />
+            </label>
+            <button id="exportCsvButton" class="export-button" type="button" disabled>Xuất CSV / Excel</button>
+          </div>
         </div>
         <div class="history-meta">
           <span id="historyStatus" role="status" aria-live="polite">Chọn ngày để xem dữ liệu</span>
@@ -230,6 +233,6 @@
       </section>
     </main>
 
-    <script src="./script.js?v=14"></script>
+    <script src="./script.js?v=15"></script>
   </body>
 </html>

@@ -44,6 +44,7 @@ const loginHistoryLog = document.querySelector("#loginHistoryLog");
 const chart = document.querySelector("#environmentChart");
 const context = chart.getContext("2d");
 const historyDaySelect = document.querySelector("#historyDaySelect");
+const exportCsvButton = document.querySelector("#exportCsvButton");
 const historyStatus = document.querySelector("#historyStatus");
 const historyChart = document.querySelector("#historyChart");
 const historyContext = historyChart.getContext("2d");
@@ -270,6 +271,7 @@ function loadHistoryForSelectedDay() {
   stopHistoryFirestore();
   historyReadings = [];
   updateHistoryStatistics();
+  updateExportButtonState();
   const start = new Date(`${historyDaySelect.value}T00:00:00`);
   const end = new Date(start);
   end.setDate(start.getDate() + 1);
@@ -294,6 +296,7 @@ function loadHistoryForSelectedDay() {
         ? `${historyReadings.length} mẫu trong ngày ${start.toLocaleDateString("vi-VN")} - đang cập nhật`
         : `Chưa có dữ liệu ngày ${start.toLocaleDateString("vi-VN")} - đang theo dõi`;
       updateHistoryStatistics();
+      updateExportButtonState();
       resizeHistoryCanvas();
     },
     (error) => {
@@ -301,6 +304,7 @@ function loadHistoryForSelectedDay() {
       historyReadings = [];
       historyStatus.textContent = `Không theo dõi được lịch sử: ${getFirebaseErrorText(error)}`;
       updateHistoryStatistics();
+      updateExportButtonState();
       resizeHistoryCanvas();
     },
   );
@@ -338,6 +342,58 @@ function updateHistoryStatistics() {
     maxElement.textContent = format(Math.max(...values));
     averageElement.textContent = format(average);
   });
+}
+
+function updateExportButtonState() {
+  exportCsvButton.disabled = historyReadings.length === 0;
+}
+
+function escapeCsvValue(value) {
+  const text = String(value ?? "");
+  return `"${text.replaceAll('"', '""')}"`;
+}
+
+function calculateFieldStatistics(field) {
+  const values = historyReadings.map((reading) => reading[field]);
+  return {
+    min: Math.min(...values),
+    max: Math.max(...values),
+    average: values.reduce((sum, value) => sum + value, 0) / values.length,
+  };
+}
+
+function exportHistoryCsv() {
+  if (!historyReadings.length) return;
+
+  const temperatureStats = calculateFieldStatistics("temperature");
+  const humidityStats = calculateFieldStatistics("humidity");
+  const rows = [
+    ["BÁO CÁO DỮ LIỆU NHÀ KÍNH"],
+    ["Ngày", historyDaySelect.value],
+    ["Số mẫu", historyReadings.length],
+    [],
+    ["Chỉ số", "Nhỏ nhất", "Lớn nhất", "Trung bình"],
+    ["Nhiệt độ (°C)", temperatureStats.min.toFixed(1), temperatureStats.max.toFixed(1), temperatureStats.average.toFixed(1)],
+    ["Độ ẩm (%)", humidityStats.min.toFixed(1), humidityStats.max.toFixed(1), humidityStats.average.toFixed(1)],
+    [],
+    ["Thời gian", "Nhiệt độ (°C)", "Độ ẩm (%)", "Trạng thái (%)"],
+    ...historyReadings.map((reading) => [
+      reading.time.toLocaleString("vi-VN"),
+      reading.temperature.toFixed(1),
+      reading.humidity,
+      calculateHealth(reading.temperature, reading.humidity),
+    ]),
+  ];
+  const csvContent = `sep=,\r\n${rows.map((row) => row.map(escapeCsvValue).join(",")).join("\r\n")}`;
+  const blob = new Blob(["\ufeff", csvContent], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const downloadLink = document.createElement("a");
+  downloadLink.href = url;
+  downloadLink.download = `bao-cao-nha-kinh-${historyDaySelect.value}.csv`;
+  document.body.append(downloadLink);
+  downloadLink.click();
+  downloadLink.remove();
+  URL.revokeObjectURL(url);
 }
 
 function startChartPlayback() {
@@ -917,6 +973,7 @@ logoutButton.addEventListener("click", async () => {
 });
 
 historyDaySelect.addEventListener("change", loadHistoryForSelectedDay);
+exportCsvButton.addEventListener("click", exportHistoryCsv);
 thresholdForm.addEventListener("submit", (event) => {
   event.preventDefault();
 
