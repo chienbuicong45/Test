@@ -848,10 +848,11 @@ function drawGrid(width, height, padding, plotWidth, plotHeight) {
 
   context.fillText("40°C / 100%", 4, padding.top + 4);
   context.fillText("18°C / 30%", 6, height - padding.bottom);
-  context.fillText("Hiện tại", padding.left, height - 8);
   const rangeLabel = `${chartRangeSeconds} giây trước`;
-  const rangeLabelWidth = context.measureText(rangeLabel).width;
-  context.fillText(rangeLabel, width - padding.right - rangeLabelWidth, height - 8);
+  context.fillText(rangeLabel, padding.left, height - 8);
+  const currentLabel = "Hiện tại";
+  const currentLabelWidth = context.measureText(currentLabel).width;
+  context.fillText(currentLabel, width - padding.right - currentLabelWidth, height - 8);
 }
 
 function drawLine({ color, points, min, max, padding, plotWidth, plotHeight }) {
@@ -863,8 +864,7 @@ function drawLine({ color, points, min, max, padding, plotWidth, plotHeight }) {
 
   const maxPoints = getRealtimeMaxPoints();
   points.forEach((value, index) => {
-    const reverseIndex = points.length - 1 - index;
-    const x = padding.left + (plotWidth / Math.max(maxPoints - 1, 1)) * reverseIndex;
+    const x = padding.left + (plotWidth / Math.max(maxPoints - 1, 1)) * index;
     const normalized = (value - min) / (max - min);
     const y = padding.top + plotHeight - clamp(normalized, 0, 1) * plotHeight;
 
@@ -992,7 +992,7 @@ function showReadingTooltip(event, isHistory) {
   source.forEach((reading, index) => {
     const pointX = isHistory && source.length === 1
       ? padding.left + plotWidth / 2
-      : padding.left + step * (isHistory ? index : source.length - 1 - index);
+      : padding.left + step * index;
     const distance = Math.abs(pointerX - pointX);
     if (distance < nearestDistance) {
       nearestDistance = distance;
@@ -1008,9 +1008,7 @@ function showReadingTooltip(event, isHistory) {
   const reading = source[nearestIndex];
   const position = isHistory && source.length === 1
     ? 0
-    : isHistory
-      ? clamp((pointerX - padding.left) / step, 0, source.length - 1)
-      : source.length - 1 - clamp((pointerX - padding.left) / step, 0, source.length - 1);
+    : clamp((pointerX - padding.left) / step, 0, source.length - 1);
   const lowerIndex = Math.floor(position);
   const upperIndex = Math.min(source.length - 1, Math.ceil(position));
   const progress = position - lowerIndex;
