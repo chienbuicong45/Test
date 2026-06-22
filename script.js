@@ -73,7 +73,7 @@ const notificationEmailInput = document.querySelector("#notificationEmailInput")
 const emailNotificationEnabledInput = document.querySelector("#emailNotificationEnabledInput");
 const emailNotificationMessage = document.querySelector("#emailNotificationMessage");
 
-const expectedReadingIntervalMs = 1000;
+const expectedReadingIntervalMs = 2000;
 const connectionCheckIntervalMs = 1000;
 const deviceStaleAfterMs = 15000;
 const historyDays = 7;
