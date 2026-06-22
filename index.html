@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#2f8a5f" />
     <title>Greenhouse Monitor</title>
     <link rel="preconnect" href="https://www.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="./styles.css?v=10" />
+    <link rel="stylesheet" href="./styles.css?v=11" />
   </head>
   <body>
     <main id="authView" class="auth-view">
@@ -111,15 +111,42 @@
           <div class="section-head">
             <div>
               <p class="eyebrow">Biểu đồ</p>
-              <h2>Dữ liệu 60 giây gần nhất</h2>
+              <h2 id="realtimeChartTitle">Dữ liệu 60 giây gần nhất</h2>
             </div>
-            <div class="legend">
-              <span><i class="temp-dot"></i>Nhiệt độ</span>
-              <span><i class="humid-dot"></i>Độ ẩm</span>
+            <div class="chart-controls">
+              <label for="chartRangeSelect">
+                <span>Khoảng thời gian</span>
+                <select id="chartRangeSelect">
+                  <option value="30">30 giây</option>
+                  <option value="60" selected>60 giây</option>
+                  <option value="120">120 giây</option>
+                </select>
+              </label>
+              <div class="legend">
+                <span><i class="temp-dot"></i>Nhiệt độ</span>
+                <span><i class="humid-dot"></i>Độ ẩm</span>
+              </div>
             </div>
           </div>
-          <canvas id="environmentChart" aria-label="Biểu đồ nhiệt độ và độ ẩm"></canvas>
+          <div class="chart-stage">
+            <canvas id="environmentChart" role="img" aria-label="Biểu đồ nhiệt độ và độ ẩm" aria-describedby="realtimeChartStatus"></canvas>
+            <p id="realtimeChartStatus" class="chart-empty-state" role="status">Đang chờ dữ liệu từ thiết bị...</p>
+          </div>
           <div id="realtimeTooltip" class="chart-tooltip" role="status"></div>
+          <details class="data-table-details">
+            <summary>Xem dữ liệu dạng bảng</summary>
+            <div class="data-table-scroll">
+              <table>
+                <caption>Dữ liệu nhiệt độ và độ ẩm theo thời gian</caption>
+                <thead>
+                  <tr><th scope="col">Thời gian</th><th scope="col">Nhiệt độ</th><th scope="col">Độ ẩm</th></tr>
+                </thead>
+                <tbody id="realtimeDataTableBody">
+                  <tr><td colspan="3">Chưa có dữ liệu</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </details>
         </article>
 
         <aside class="side-panel">
@@ -233,6 +260,6 @@
       </section>
     </main>
 
-    <script src="./script.js?v=16"></script>
+    <script src="./script.js?v=17"></script>
   </body>
 </html>

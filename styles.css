@@ -388,6 +388,92 @@ h2 {
   position: relative;
 }
 
+.chart-controls {
+  display: grid;
+  justify-items: end;
+  gap: 10px;
+}
+
+.chart-controls > label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.chart-controls select {
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 30px 0 10px;
+  color: var(--ink);
+  background: var(--paper);
+}
+
+.chart-stage {
+  position: relative;
+}
+
+.chart-empty-state:not([hidden]) {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  margin: 0;
+  transform: translate(-50%, -50%);
+  color: var(--muted);
+  text-align: center;
+  pointer-events: none;
+}
+
+.data-table-details {
+  margin-top: 14px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.data-table-details summary {
+  width: fit-content;
+  color: var(--green);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.data-table-scroll {
+  max-height: 320px;
+  margin-top: 12px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.data-table-scroll table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--paper);
+}
+
+.data-table-scroll caption {
+  padding: 10px 12px;
+  color: var(--muted);
+  text-align: left;
+}
+
+.data-table-scroll th,
+.data-table-scroll td {
+  padding: 9px 12px;
+  border-top: 1px solid var(--line);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.data-table-scroll th {
+  position: sticky;
+  top: 0;
+  color: var(--ink);
+  background: #f4f8f5;
+}
+
 .chart-tooltip {
   position: absolute;
   z-index: 4;
@@ -676,6 +762,11 @@ h2 {
   .hero-actions {
     display: flex;
     justify-content: flex-start;
+  }
+
+  .chart-controls {
+    justify-items: start;
+    margin-top: 16px;
   }
 
   .metrics,

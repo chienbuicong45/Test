@@ -43,6 +43,10 @@ const eventLog = document.querySelector("#eventLog");
 const loginHistoryLog = document.querySelector("#loginHistoryLog");
 const chart = document.querySelector("#environmentChart");
 const context = chart.getContext("2d");
+const realtimeChartTitle = document.querySelector("#realtimeChartTitle");
+const realtimeChartStatus = document.querySelector("#realtimeChartStatus");
+const chartRangeSelect = document.querySelector("#chartRangeSelect");
+const realtimeDataTableBody = document.querySelector("#realtimeDataTableBody");
 const historyDaySelect = document.querySelector("#historyDaySelect");
 const exportCsvButton = document.querySelector("#exportCsvButton");
 const historyStatus = document.querySelector("#historyStatus");
@@ -68,7 +72,7 @@ const notificationEmailInput = document.querySelector("#notificationEmailInput")
 const emailNotificationEnabledInput = document.querySelector("#emailNotificationEnabledInput");
 const emailNotificationMessage = document.querySelector("#emailNotificationMessage");
 
-const maxPoints = 60;
+const chartPlaybackIntervalMs = 2000;
 const historyDays = 7;
 const thresholdStorageKey = "greenhouse-alert-thresholds";
 const emailNotificationStorageKey = "greenhouse-email-notifications";
@@ -97,6 +101,7 @@ let latestReading = null;
 let latestReadingReceivedAt = 0;
 let chartIntervalId = null;
 let resizeFrameId = null;
+let chartRangeSeconds = Number(chartRangeSelect.value);
 
 function getFirebaseErrorText(error) {
   const code = error?.code || "unknown";
@@ -176,6 +181,7 @@ async function setupFirebase() {
 
       showDashboardView();
       readings.splice(0, readings.length);
+      updateRealtimeDataPresentation("Đang chờ dữ liệu từ thiết bị...");
       eventLog.replaceChildren();
       renderLoginHistory();
       connectionText.textContent = "Đang kết nối Firestore";
@@ -205,12 +211,18 @@ function listenToReadings() {
     (snapshot) => {
       if (!snapshot.exists()) {
         connectionText.textContent = "Firestore sẵn sàng - chưa có dữ liệu";
+        readings.splice(0, readings.length);
+        updateRealtimeDataPresentation("Chưa có dữ liệu để hiển thị.");
+        drawChart();
         addEvent(`Chưa có collection "${firestorePath.collection}" với document "${firestorePath.document}"`, "warning");
         return;
       }
 
       const latest = normalizeReading(snapshot.data());
       if (!latest) {
+        readings.splice(0, readings.length);
+        updateRealtimeDataPresentation("Dữ liệu nhận được không hợp lệ.");
+        drawChart();
         addEvent("Dữ liệu Firestore thiếu temperature hoặc humidity", "warning");
         return;
       }
@@ -224,6 +236,9 @@ function listenToReadings() {
     (error) => {
       console.error(error);
       connectionText.textContent = "Lỗi đọc Firestore";
+      readings.splice(0, readings.length);
+      updateRealtimeDataPresentation("Không thể tải dữ liệu biểu đồ.");
+      drawChart();
       addEvent(`Không đọc được dữ liệu Firestore: ${getFirebaseErrorText(error)}`, "danger");
     },
   );
@@ -427,7 +442,7 @@ function startChartPlayback() {
       ...latestReading,
       time: new Date(),
     });
-  }, 2000);
+  }, chartPlaybackIntervalMs);
 }
 
 function stopChartPlayback() {
@@ -625,6 +640,73 @@ function addEvent(message, level = "normal") {
   }
 }
 
+function getRealtimeMaxPoints() {
+  return Math.floor((chartRangeSeconds * 1000) / chartPlaybackIntervalMs) + 1;
+}
+
+function trimRealtimeReadings() {
+  const maxPoints = getRealtimeMaxPoints();
+  while (readings.length > maxPoints) readings.shift();
+}
+
+function renderRealtimeDataTable() {
+  realtimeDataTableBody.replaceChildren();
+
+  if (!readings.length) {
+    const row = document.createElement("tr");
+    const cell = document.createElement("td");
+    cell.colSpan = 3;
+    cell.textContent = "Chưa có dữ liệu";
+    row.append(cell);
+    realtimeDataTableBody.append(row);
+    return;
+  }
+
+  [...readings].reverse().forEach((reading) => {
+    const row = document.createElement("tr");
+    const timeCell = document.createElement("td");
+    const temperatureCell = document.createElement("td");
+    const humidityCell = document.createElement("td");
+    timeCell.textContent = reading.time.toLocaleTimeString("vi-VN");
+    temperatureCell.textContent = `${reading.temperature.toFixed(1)}°C`;
+    humidityCell.textContent = `${reading.humidity}%`;
+    row.append(timeCell, temperatureCell, humidityCell);
+    realtimeDataTableBody.append(row);
+  });
+}
+
+function updateRealtimeDataPresentation(message = "") {
+  renderRealtimeDataTable();
+
+  if (message) {
+    realtimeChartStatus.textContent = message;
+    realtimeChartStatus.hidden = false;
+  } else if (readings.length === 0) {
+    realtimeChartStatus.textContent = "Đang chờ dữ liệu từ thiết bị...";
+    realtimeChartStatus.hidden = false;
+  } else if (readings.length === 1) {
+    realtimeChartStatus.textContent = "Đã nhận 1 mẫu, cần thêm dữ liệu để vẽ đường biểu đồ.";
+    realtimeChartStatus.hidden = false;
+  } else {
+    realtimeChartStatus.hidden = true;
+  }
+
+  chart.setAttribute(
+    "aria-label",
+    readings.length
+      ? `Biểu đồ gồm ${readings.length} mẫu trong ${chartRangeSeconds} giây gần nhất`
+      : "Biểu đồ chưa có dữ liệu",
+  );
+}
+
+function updateRealtimeChartRange() {
+  chartRangeSeconds = Number(chartRangeSelect.value);
+  realtimeChartTitle.textContent = `Dữ liệu ${chartRangeSeconds} giây gần nhất`;
+  trimRealtimeReadings();
+  updateRealtimeDataPresentation();
+  drawChart();
+}
+
 function loadLoginHistory() {
   try {
     const saved = JSON.parse(localStorage.getItem(loginHistoryStorageKey));
@@ -734,7 +816,7 @@ function drawGrid(width, height, padding, plotWidth, plotHeight) {
 
   context.fillText("40°C / 100%", 4, padding.top + 4);
   context.fillText("18°C / 30%", 6, height - padding.bottom);
-  context.fillText("60 giây", width - 68, height - 8);
+  context.fillText(`${chartRangeSeconds} giây`, width - 76, height - 8);
 }
 
 function drawLine({ color, points, min, max, padding, plotWidth, plotHeight }) {
@@ -744,8 +826,10 @@ function drawLine({ color, points, min, max, padding, plotWidth, plotHeight }) {
   context.lineCap = "round";
   context.beginPath();
 
+  const maxPoints = getRealtimeMaxPoints();
+  const pointOffset = Math.max(maxPoints - points.length, 0);
   points.forEach((value, index) => {
-    const x = padding.left + (plotWidth / (maxPoints - 1)) * index;
+    const x = padding.left + (plotWidth / Math.max(maxPoints - 1, 1)) * (pointOffset + index);
     const normalized = (value - min) / (max - min);
     const y = padding.top + plotHeight - clamp(normalized, 0, 1) * plotHeight;
 
@@ -865,15 +949,16 @@ function showReadingTooltip(event, isHistory) {
   const pointerY = event.clientY - rect.top;
   const denominator = isHistory
     ? Math.max(source.length - 1, 1)
-    : maxPoints - 1;
+    : Math.max(getRealtimeMaxPoints() - 1, 1);
   const step = plotWidth / denominator;
+  const pointOffset = isHistory ? 0 : Math.max(getRealtimeMaxPoints() - source.length, 0);
 
   let nearestIndex = 0;
   let nearestDistance = Number.POSITIVE_INFINITY;
   source.forEach((reading, index) => {
     const pointX = isHistory && source.length === 1
       ? padding.left + plotWidth / 2
-      : padding.left + step * index;
+      : padding.left + step * (pointOffset + index);
     const distance = Math.abs(pointerX - pointX);
     if (distance < nearestDistance) {
       nearestDistance = distance;
@@ -889,7 +974,7 @@ function showReadingTooltip(event, isHistory) {
   const reading = source[nearestIndex];
   const position = isHistory && source.length === 1
     ? 0
-    : clamp((pointerX - padding.left) / step, 0, source.length - 1);
+    : clamp((pointerX - padding.left) / step - pointOffset, 0, source.length - 1);
   const lowerIndex = Math.floor(position);
   const upperIndex = Math.min(source.length - 1, Math.ceil(position));
   const progress = position - lowerIndex;
@@ -918,7 +1003,7 @@ function showReadingTooltip(event, isHistory) {
     minute: "2-digit",
     second: isHistory ? undefined : "2-digit",
   });
-  const cardRect = targetChart.parentElement.getBoundingClientRect();
+  const cardRect = targetChart.closest(".chart-card, .history-card").getBoundingClientRect();
   const tooltipX = Math.min(cardRect.width - 80, Math.max(80, event.clientX - cardRect.left));
   const tooltipY = event.clientY - cardRect.top;
 
@@ -939,12 +1024,10 @@ function hideReadingTooltip(tooltip) {
 
 function pushReading(reading) {
   readings.push(reading);
-
-  while (readings.length > maxPoints) {
-    readings.shift();
-  }
+  trimRealtimeReadings();
 
   updateDashboard(reading);
+  updateRealtimeDataPresentation();
   drawChart();
 }
 
@@ -981,6 +1064,7 @@ logoutButton.addEventListener("click", async () => {
   try {
     await authApi.signOut(auth);
     readings.splice(0, readings.length);
+    updateRealtimeDataPresentation("Đã xóa dữ liệu biểu đồ sau khi đăng xuất.");
     historyReadings = [];
     eventLog.replaceChildren();
     stopHistoryFirestore();
@@ -995,6 +1079,7 @@ logoutButton.addEventListener("click", async () => {
 
 historyDaySelect.addEventListener("change", loadHistoryForSelectedDay);
 exportCsvButton.addEventListener("click", exportHistoryCsv);
+chartRangeSelect.addEventListener("change", updateRealtimeChartRange);
 thresholdForm.addEventListener("submit", (event) => {
   event.preventDefault();
 
