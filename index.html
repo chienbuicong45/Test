@@ -106,6 +106,45 @@
         </article>
       </section>
 
+      <section class="media-card" aria-labelledby="mediaTitle">
+        <div class="section-head media-head">
+          <div>
+            <p class="eyebrow">Quan sát</p>
+            <h2 id="mediaTitle">Camera &amp; hình ảnh nhà kính</h2>
+          </div>
+          <p id="cameraStatus" class="camera-status" role="status" aria-live="polite">Camera chưa được bật</p>
+        </div>
+        <div class="media-layout">
+          <div>
+            <div class="camera-frame">
+              <video id="cameraPreview" playsinline muted aria-label="Hình ảnh trực tiếp từ camera"></video>
+              <div id="cameraPlaceholder" class="camera-placeholder">
+                <span aria-hidden="true">◉</span>
+                <strong>Chưa có hình ảnh camera</strong>
+                <small>Nhấn “Bật camera” để bắt đầu quan sát</small>
+              </div>
+            </div>
+            <div class="camera-actions">
+              <button id="startCameraButton" type="button">Bật camera</button>
+              <button id="captureButton" class="secondary-button" type="button" disabled>Chụp ảnh</button>
+              <button id="stopCameraButton" class="secondary-button" type="button" disabled>Tắt camera</button>
+            </div>
+          </div>
+          <div class="gallery-panel">
+            <div class="gallery-toolbar">
+              <div><h3>Thư viện hình ảnh</h3><p>Ảnh chụp và ảnh từ thiết bị</p></div>
+              <label class="upload-button" for="imageUpload">Thêm hình ảnh
+                <input id="imageUpload" type="file" accept="image/*" multiple />
+              </label>
+            </div>
+            <div id="imageGallery" class="image-gallery">
+              <p id="galleryEmptyState" class="gallery-empty">Chưa có hình ảnh nào.</p>
+            </div>
+          </div>
+        </div>
+        <canvas id="cameraCanvas" hidden></canvas>
+      </section>
+
       <section class="content-grid monitor-grid">
         <article class="chart-card">
           <div class="section-head">
@@ -260,6 +299,6 @@
       </section>
     </main>
 
-    <script src="./script.js?v=23"></script>
+    <script src="./script.js?v=24"></script>
   </body>
 </html>

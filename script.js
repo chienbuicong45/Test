@@ -72,6 +72,16 @@ const emailNotificationForm = document.querySelector("#emailNotificationForm");
 const notificationEmailInput = document.querySelector("#notificationEmailInput");
 const emailNotificationEnabledInput = document.querySelector("#emailNotificationEnabledInput");
 const emailNotificationMessage = document.querySelector("#emailNotificationMessage");
+const cameraPreview = document.querySelector("#cameraPreview");
+const cameraCanvas = document.querySelector("#cameraCanvas");
+const cameraPlaceholder = document.querySelector("#cameraPlaceholder");
+const cameraStatus = document.querySelector("#cameraStatus");
+const startCameraButton = document.querySelector("#startCameraButton");
+const stopCameraButton = document.querySelector("#stopCameraButton");
+const captureButton = document.querySelector("#captureButton");
+const imageUpload = document.querySelector("#imageUpload");
+const imageGallery = document.querySelector("#imageGallery");
+const galleryEmptyState = document.querySelector("#galleryEmptyState");
 
 const expectedReadingIntervalMs = 2000;
 const connectionCheckIntervalMs = 1000;
@@ -106,6 +116,95 @@ let connectionMonitorIntervalId = null;
 let resizeFrameId = null;
 let chartRangeSeconds = Number(chartRangeSelect.value);
 let deviceIsOffline = false;
+let cameraStream = null;
+const galleryObjectUrls = new Set();
+
+function setCameraStatus(message, state = "") {
+  cameraStatus.textContent = message;
+  cameraStatus.classList.toggle("is-live", state === "live");
+  cameraStatus.classList.toggle("is-error", state === "error");
+}
+
+async function startCamera() {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    setCameraStatus("Trình duyệt không hỗ trợ camera", "error");
+    return;
+  }
+  startCameraButton.disabled = true;
+  setCameraStatus("Đang yêu cầu quyền truy cập...");
+  try {
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: "environment" } },
+      audio: false,
+    });
+    cameraPreview.srcObject = cameraStream;
+    await cameraPreview.play();
+    cameraPreview.classList.add("is-active");
+    cameraPlaceholder.hidden = true;
+    captureButton.disabled = false;
+    stopCameraButton.disabled = false;
+    setCameraStatus("Camera đang hoạt động", "live");
+  } catch (error) {
+    console.error(error);
+    startCameraButton.disabled = false;
+    setCameraStatus(error?.name === "NotAllowedError" ? "Bạn chưa cấp quyền camera" : "Không thể mở camera", "error");
+  }
+}
+
+function stopCamera() {
+  cameraStream?.getTracks().forEach((track) => track.stop());
+  cameraStream = null;
+  cameraPreview.srcObject = null;
+  cameraPreview.classList.remove("is-active");
+  cameraPlaceholder.hidden = false;
+  startCameraButton.disabled = false;
+  captureButton.disabled = true;
+  stopCameraButton.disabled = true;
+  setCameraStatus("Camera đã tắt");
+}
+
+function addGalleryImage(source, label, objectUrl = "") {
+  galleryEmptyState.hidden = true;
+  const figure = document.createElement("figure");
+  const image = document.createElement("img");
+  const removeButton = document.createElement("button");
+  figure.className = "gallery-item";
+  image.src = source;
+  image.alt = label;
+  removeButton.type = "button";
+  removeButton.textContent = "×";
+  removeButton.setAttribute("aria-label", `Xóa ${label}`);
+  removeButton.addEventListener("click", () => {
+    if (objectUrl) {
+      URL.revokeObjectURL(objectUrl);
+      galleryObjectUrls.delete(objectUrl);
+    }
+    figure.remove();
+    galleryEmptyState.hidden = imageGallery.querySelectorAll(".gallery-item").length > 0;
+  });
+  figure.append(image, removeButton);
+  imageGallery.append(figure);
+}
+
+function captureCameraImage() {
+  if (!cameraStream || !cameraPreview.videoWidth) return;
+  cameraCanvas.width = cameraPreview.videoWidth;
+  cameraCanvas.height = cameraPreview.videoHeight;
+  cameraCanvas.getContext("2d").drawImage(cameraPreview, 0, 0);
+  const timestamp = new Date().toLocaleString("vi-VN");
+  addGalleryImage(cameraCanvas.toDataURL("image/jpeg", 0.9), `Ảnh camera chụp lúc ${timestamp}`);
+  setCameraStatus(`Đã chụp ảnh lúc ${new Date().toLocaleTimeString("vi-VN")}`, "live");
+}
+
+function addUploadedImages(event) {
+  [...event.target.files].forEach((file) => {
+    if (!file.type.startsWith("image/")) return;
+    const objectUrl = URL.createObjectURL(file);
+    galleryObjectUrls.add(objectUrl);
+    addGalleryImage(objectUrl, file.name, objectUrl);
+  });
+  imageUpload.value = "";
+}
 
 function getFirebaseErrorText(error) {
   const code = error?.code || "unknown";
@@ -130,6 +229,7 @@ function showAuthView(message = "") {
   authView.hidden = false;
   dashboardView.hidden = true;
   authMessage.textContent = message;
+  if (cameraStream) stopCamera();
   stopReadingFirestore();
   stopHistoryFirestore();
   stopConnectionMonitor();
@@ -1197,6 +1297,10 @@ chart.addEventListener("pointermove", (event) => showReadingTooltip(event, false
 chart.addEventListener("pointerleave", () => hideReadingTooltip(realtimeTooltip));
 historyChart.addEventListener("pointermove", (event) => showReadingTooltip(event, true));
 historyChart.addEventListener("pointerleave", () => hideReadingTooltip(historyTooltip));
+startCameraButton.addEventListener("click", startCamera);
+stopCameraButton.addEventListener("click", stopCamera);
+captureButton.addEventListener("click", captureCameraImage);
+imageUpload.addEventListener("change", addUploadedImages);
 
 window.addEventListener("resize", () => {
   cancelAnimationFrame(resizeFrameId);
@@ -1206,6 +1310,8 @@ window.addEventListener("resize", () => {
   });
 });
 window.addEventListener("beforeunload", () => {
+  stopCamera();
+  galleryObjectUrls.forEach((url) => URL.revokeObjectURL(url));
   stopConnectionMonitor();
   stopReadingFirestore();
   stopHistoryFirestore();
